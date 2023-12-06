@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
-
+#![allow(dead_code)]
 //use embedded_io::*;
 //use embedded_svc::ipv4::Interface;
 use embedded_svc::wifi::{AccessPointConfiguration, Configuration, Wifi};
@@ -54,76 +54,6 @@ static CHANNEL: Channel<CriticalSectionRawMutex, u16, 10> = Channel::new();
 
 
 
-#[embassy_executor::task]
-async fn writer(mut tx: UartTx<'static, UART1>) {
-    log::info!("Waiting for MP3 module initialization 2 seconds");
-    Timer::after(Duration::from_millis(2000)).await;
-
-    log::info!("Set MP3 playback source to TF card");
-    dfplayer_mini::playbackSource(&mut tx, 2).await.unwrap();
-    Timer::after(Duration::from_millis(2000)).await;
-
-    let volume = 25;
-    log::info!("Set MP3 playback volume to '{volume}'");
-    dfplayer_mini::volume(&mut tx, volume).await.unwrap();
-    Timer::after(Duration::from_millis(2000)).await;
-
-
-    log::info!("Set playback location to song 36");
-    dfplayer_mini::play(&mut tx, 36).await.unwrap();
-    Timer::after(Duration::from_millis(2000)).await;
-
-    let receiver = CHANNEL.receiver();
-    
-    loop {
-	log::info!("Awaiting for request for MP3 playback from channel incomming from HTTP");
-	let song = receiver.receive().await;
-	log::info!("Playin MP3 file  #{song}");
-	dfplayer_mini::play(&mut tx, song).await.unwrap();
-	Timer::after(Duration::from_millis(1000)).await;
-    }
-}
-
-#[embassy_executor::task]
-async fn reader(mut rx: UartRx<'static, UART1>) {
-    const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
-    //const MAX_BUFFER_SIZE: usize = 10;
-
-    let mut rbuf: [u8; MAX_BUFFER_SIZE] = [0u8; MAX_BUFFER_SIZE];
-    let mut offset = 0;
-
-    loop {
-	log::info!("Waiting for incomming responses from MP3 module");
-        //let r = with_timeout(Duration::from_secs_floor(2),embedded_io_async::Read::read(&mut rx, &mut rbuf[offset..])).await;
-	let r = embedded_io_async::Read::read(&mut rx, &mut rbuf[offset..]).await;
-	log::info!("MP3 module incomming data!");
-        match r {
-            Ok(len) => {
-                offset += len;
-                log::info!("MP3 module Read: {len}, data: {:?}", &rbuf[..offset]);
-                offset = 0;
-                //sender.send(0);
-            }
-            Err(e) => log::error!("MP3 RX Error: {:?}", e),
-        }
-    }
-}
-
-#[embassy_executor::task]
-async fn loop_luces(mut io12: GpioPin<Output<PushPull>, 12>) {
-
-    loop {
-	Timer::after(Duration::from_millis(1000)).await;
-
-	io12.set_low().unwrap();
-	Timer::after(Duration::from_millis(1000)).await;
-
-	io12.set_high().unwrap();
-    }
-    
-}
-
-
 #[main]
 async fn main(spawner: Spawner) {
     // setup logger
@@ -148,7 +78,7 @@ async fn main(spawner: Spawner) {
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let mut led = io.pins.gpio12.into_push_pull_output();
+    let led = io.pins.gpio12.into_push_pull_output();
 
     esp32c3_hal::interrupt::enable(
         esp32c3_hal::peripherals::Interrupt::GPIO,
@@ -167,7 +97,7 @@ async fn main(spawner: Spawner) {
         io.pins.gpio1.into_floating_input(),
     );
     
-    let mut uart1 = Uart::new_with_config(
+    let uart1 = Uart::new_with_config(
 	peripherals.UART1,
 	uart_config,
 	Some(uart_pins),
@@ -240,6 +170,76 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
+async fn writer(mut tx: UartTx<'static, UART1>) {
+    log::info!("Waiting for MP3 module initialization 2 seconds");
+    Timer::after(Duration::from_millis(2000)).await;
+
+    log::info!("Set MP3 playback source to TF card");
+    dfplayer_mini::playback_source(&mut tx, 2).await.unwrap();
+    Timer::after(Duration::from_millis(2000)).await;
+
+    let volume = 25;
+    log::info!("Set MP3 playback volume to '{volume}'");
+    dfplayer_mini::volume(&mut tx, volume).await.unwrap();
+    Timer::after(Duration::from_millis(2000)).await;
+
+
+    log::info!("Play welcome message: Song 37");
+    dfplayer_mini::play(&mut tx, 37).await.unwrap();
+    Timer::after(Duration::from_millis(2000)).await;
+
+    let receiver = CHANNEL.receiver();
+    
+    loop {
+	log::info!("Awaiting for request for MP3 playback from channel incomming from HTTP");
+	let song = receiver.receive().await;
+	log::info!("Playin MP3 file  #{song}");
+	dfplayer_mini::play(&mut tx, song).await.unwrap();
+	Timer::after(Duration::from_millis(1000)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn reader(mut rx: UartRx<'static, UART1>) {
+    const MAX_BUFFER_SIZE: usize = 10 * READ_BUF_SIZE + 16;
+    //const MAX_BUFFER_SIZE: usize = 10;
+
+    let mut rbuf: [u8; MAX_BUFFER_SIZE] = [0u8; MAX_BUFFER_SIZE];
+    let mut offset = 0;
+
+    loop {
+	log::info!("Waiting for incomming responses from MP3 module");
+        //let r = with_timeout(Duration::from_secs_floor(2),embedded_io_async::Read::read(&mut rx, &mut rbuf[offset..])).await;
+	let r = embedded_io_async::Read::read(&mut rx, &mut rbuf[offset..]).await;
+	log::info!("MP3 module incomming data!");
+        match r {
+            Ok(len) => {
+                offset += len;
+                log::info!("MP3 module Read: {len}, data: {:?}", &rbuf[..offset]);
+                offset = 0;
+                //sender.send(0);
+            }
+            Err(e) => log::error!("MP3 RX Error: {:?}", e),
+        }
+    }
+}
+
+#[embassy_executor::task]
+async fn loop_luces(mut io12: GpioPin<Output<PushPull>, 12>) {
+
+    loop {
+	Timer::after(Duration::from_millis(1000)).await;
+
+	io12.set_low().unwrap();
+	Timer::after(Duration::from_millis(1000)).await;
+
+	io12.set_high().unwrap();
+    }
+    
+}
+
+
+#[embassy_executor::task]
 async fn socket_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>){
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
@@ -250,7 +250,7 @@ async fn socket_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>){
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    log::info!("Connect to the AP `pesebre-navidad` and point your browser to http://192.168.2.1/");
+    log::info!("Connect to the AP `pesebre-navideño` and point your browser to http://192.168.2.1/");
     log::info!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
@@ -367,7 +367,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
 		if !matches!(controller.is_started(), Ok(true)) {
 		    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-			ssid: "pesebre-navidad".into(),
+			ssid: "pesebre-navideño".into(),
 			..Default::default()
 		    });
 		    controller.set_configuration(&client_config).unwrap();

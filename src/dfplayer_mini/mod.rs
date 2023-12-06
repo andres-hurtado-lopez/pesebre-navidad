@@ -1,11 +1,13 @@
 use esp32c3_hal::UartTx;
 use esp32c3_hal::peripherals::UART1;
 
-const STACK_SIZE : u8      = 10;   // total number of bytes in a stack/packet (same for cmds and queries)
+
+
 const SB : u8              = 0x7E; // start byte
 const VER : u8             = 0xFF; // version
 const LEN : u8             = 0x6;  // number of bytes after "LEN" (except for checksum data and EB)
 const FEEDBACK : u8        = 1;    // feedback requested
+#[allow(dead_code)]
 const NO_FEEDBACK : u8     = 0;    // no feedback requested
 const EB : u8              = 0xEF; // end byte
 
@@ -85,48 +87,48 @@ const STOP_REPEAT : u8     = 0;
 const START_REPEAT : u8    = 1;
 
 struct Message{
-    commandValue: u8,
-    feedbackValue: u8,
-    paramMSB: u8,
-    paramLSB: u8,
+    command_value: u8,
+    feedback_value: u8,
+    param_msb: u8,
+    param_lsb: u8,
 }
 
 impl Message{
-    fn build(commandValue: u8, feedbackValue:u8, paramMSB: u8, paramLSB: u8, checksumMSB: u8, checksumLSB: u8) -> Self {
+    fn build(command_value: u8, feedback_value:u8, param_msb: u8, param_lsb: u8) -> Self {
 	Self{
-	    commandValue,
-	    feedbackValue,
-	    paramMSB,
-	    paramLSB,
+	    command_value,
+	    feedback_value,
+	    param_msb,
+	    param_lsb,
 	}	
     }
 
     fn into_buffer(self) -> [u8; (LEN + 4) as usize] {
 
-	let (checksumMSB, checksumLSB) = self.findChecksum();
+	let (checksum_msb, checksum_lsb) = self.find_checksum();
 	
 	[
 	    SB,
 	    VER,
 	    LEN,
-	    self.commandValue,
-	    self.feedbackValue,
-	    self.paramMSB,
-	    self.paramLSB,
-	    checksumMSB,
-	    checksumLSB,
+	    self.command_value,
+	    self.feedback_value,
+	    self.param_msb,
+	    self.param_lsb,
+	    checksum_msb,
+	    checksum_lsb,
 	    EB,
 	]
     }
 
-    fn findChecksum(&self) -> (u8,u8) {
+    fn find_checksum(&self) -> (u8,u8) {
 	let cs : u16 = (0 as u16)
 	    .overflowing_sub(VER as u16).0
 	    .overflowing_sub(LEN as u16).0
-	    .overflowing_sub(self.commandValue as u16).0
-	    .overflowing_sub(self.feedbackValue as u16).0
-	    .overflowing_sub(self.paramMSB as u16).0
-	    .overflowing_sub(self.paramLSB as u16).0;
+	    .overflowing_sub(self.command_value as u16).0
+	    .overflowing_sub(self.feedback_value as u16).0
+	    .overflowing_sub(self.param_msb as u16).0
+	    .overflowing_sub(self.param_lsb as u16).0;
 	
 	let msv :u8 = (cs >> 8) as u8;
 	let lsv :u8 = (cs & 0xFF) as u8;
@@ -135,58 +137,72 @@ impl Message{
 
 }
 
-pub async fn playNext(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn play_next(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message {
-	commandValue: NEXT,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: NEXT,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+
     
     
     Ok(())
 
 }
 
-pub async fn playPrevious(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn play_previous(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message {
-	commandValue: PREV,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: PREV,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+
     
     
     Ok(())
 
 }
 
-pub async fn play(tx: &mut UartTx<'static, UART1>, trackNum : u16) -> Result<(), ()> {
+pub async fn play(tx: &mut UartTx<'static, UART1>, track_num : u16) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: PLAY,
-	feedbackValue: FEEDBACK,
-	paramMSB: ((trackNum >> 8) & 0xFF) as u8,
-	paramLSB: (trackNum & 0xFF) as u8,
+	command_value: PLAY,
+	feedback_value: FEEDBACK,
+	param_msb: ((track_num >> 8) & 0xFF) as u8,
+	param_lsb: (track_num & 0xFF) as u8,
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+	
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+
     
     
     Ok(())
@@ -196,122 +212,140 @@ pub async fn play(tx: &mut UartTx<'static, UART1>, trackNum : u16) -> Result<(),
 pub async fn stop(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: STOP,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 0,
+	command_value: STOP,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 0,
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
 
 }
 
-pub async fn playFromMP3Folder(tx: &mut UartTx<'static, UART1>, trackNum: u16) -> Result<(), ()> {
+pub async fn play_from_mp3_folder(tx: &mut UartTx<'static, UART1>, track_num: u16) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: USE_MP3_FOLDER,
-	feedbackValue: FEEDBACK,
-	paramMSB: ((trackNum >> 8) & 0xFF) as u8,
-	paramLSB: (trackNum & 0xFF) as u8,
+	command_value: USE_MP3_FOLDER,
+	feedback_value: FEEDBACK,
+	param_msb: ((track_num >> 8) & 0xFF) as u8,
+	param_lsb: (track_num & 0xFF) as u8,
 
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
 
 }
 
-pub async fn playAdvertisement(tx: &mut UartTx<'static, UART1>, trackNum: u16) -> Result<(), ()> {
+pub async fn play_advertisement(tx: &mut UartTx<'static, UART1>, track_num: u16) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: INSERT_ADVERT,
-	feedbackValue: FEEDBACK,
-	paramMSB: ((trackNum >> 8) & 0xFF) as u8,
-	paramLSB: (trackNum & 0xFF) as u8,
+	command_value: INSERT_ADVERT,
+	feedback_value: FEEDBACK,
+	param_msb: ((track_num >> 8) & 0xFF) as u8,
+	param_lsb: (track_num & 0xFF) as u8,
 
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
 
 }
 
-pub async fn stopAdvertisement(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn stop_advertisement(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: STOP_ADVERT,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 0,
+	command_value: STOP_ADVERT,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 0,
 	
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
 	
 }
 
-pub async fn incVolume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn inc_volume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: INC_VOL,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: INC_VOL,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
 
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
 
 }
 
-pub async fn decVolume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn dec_volume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: DEC_VOL,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: DEC_VOL,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
 
     };
 
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
-    tx.write_bytes(&buff).map_err(|why| () )?;
-    embedded_io_async::Write::flush(tx).await.map_err(|why| () )?;
+    tx.write_bytes(&buff).map_err(|why|{
+	log::info!("Failed sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
+    embedded_io_async::Write::flush(tx).await.map_err(|why|{
+	log::info!("Failed flushing buffer when sending MP3 module the sequence {buff:x?}. Reason {why:?}");
+    })?;
     
     
     Ok(())
@@ -322,15 +356,14 @@ pub async fn decVolume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 pub async fn volume(tx: &mut UartTx<'static, UART1>, volume: u8) -> Result<(), ()> {
 
     let m = Message{
-	commandValue: VOLUME,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: volume,
+	command_value: VOLUME,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: volume,
     };
 
     let buff = m.into_buffer();
 
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
 
@@ -339,18 +372,17 @@ pub async fn volume(tx: &mut UartTx<'static, UART1>, volume: u8) -> Result<(), (
 
 }
 
-pub async fn eqSelect(tx: &mut UartTx<'static, UART1>, setting: u8) -> Result<(), ()> {
+pub async fn eq_select(tx: &mut UartTx<'static, UART1>, setting: u8) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: EQ,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: setting,
+	command_value: EQ,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: setting,
     };
 
     let buff = m.into_buffer();
 
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
 
@@ -362,15 +394,14 @@ pub async fn eqSelect(tx: &mut UartTx<'static, UART1>, setting: u8) -> Result<()
 pub async fn r#loop(tx: &mut UartTx<'static, UART1>, track: u16) -> Result<(), ()> {
 
     let m = Message{
-	commandValue: PLAYBACK_MODE,
-	feedbackValue: FEEDBACK,
-	paramMSB: ((track >> 8) & 0xFF) as u8,
-	paramLSB: (track & 0xFF) as u8,
+	command_value: PLAYBACK_MODE,
+	feedback_value: FEEDBACK,
+	param_msb: ((track >> 8) & 0xFF) as u8,
+	param_lsb: (track & 0xFF) as u8,
     };
 
     let buff = m.into_buffer();
 
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
 
@@ -379,18 +410,16 @@ pub async fn r#loop(tx: &mut UartTx<'static, UART1>, track: u16) -> Result<(), (
 }
 
 
-pub async fn playbackSource(tx: &mut UartTx<'static, UART1>, source: u8) -> Result<(), ()> {
+pub async fn playback_source(tx: &mut UartTx<'static, UART1>, source: u8) -> Result<(), ()> {
     if (source > 0) && (source <= 5) {
 	let m = Message{
-	    commandValue: PLAYBACK_SRC,
-	    feedbackValue: FEEDBACK,
-	    paramMSB: 0,
-	    paramLSB: source,
+	    command_value: PLAYBACK_SRC,
+	    feedback_value: FEEDBACK,
+	    param_msb: 0,
+	    param_lsb: source,
 	};
 	
 	let buff = m.into_buffer();
-	
-	log::info!("Enviando {:x?}",buff);
 	tx.write_bytes(&buff).map_err(|__why| () )?;
 	embedded_io_async::Write::flush(tx).await.map_err(|__why| () )?;
 	
@@ -402,17 +431,16 @@ pub async fn playbackSource(tx: &mut UartTx<'static, UART1>, source: u8) -> Resu
     }
 }
 
-pub async fn standbyMode(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
+pub async fn standby_mode(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
-	commandValue: STANDBY,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: STANDBY,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|__why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|__why| () )?;
     
@@ -423,15 +451,14 @@ pub async fn standbyMode(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 
 pub async fn normalMode(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
-	commandValue: NORMAL,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: NORMAL,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|__why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -442,15 +469,14 @@ pub async fn normalMode(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 
 pub async fn reset(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
-	commandValue: RESET,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: RESET,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -461,15 +487,14 @@ pub async fn reset(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 
 pub async fn resume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
-	commandValue: PLAYBACK,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: PLAYBACK,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -479,15 +504,14 @@ pub async fn resume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 
 pub async fn pause(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
-	commandValue: PAUSE,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: PAUSE,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -496,17 +520,16 @@ pub async fn pause(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 }
 
 
-pub async fn playFolder(tx: &mut UartTx<'static, UART1>, folderNum: u8, trackNum: u8) -> Result<(), ()> {
+pub async fn playFolder(tx: &mut UartTx<'static, UART1>, folderNum: u8, track_num: u8) -> Result<(), ()> {
     let m = Message{
-	commandValue: SPEC_FOLDER,
-	feedbackValue: FEEDBACK,
-	paramMSB: folderNum,
-	paramLSB: trackNum,
+	command_value: SPEC_FOLDER,
+	feedback_value: FEEDBACK,
+	param_msb: folderNum,
+	param_lsb: track_num,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -514,20 +537,19 @@ pub async fn playFolder(tx: &mut UartTx<'static, UART1>, folderNum: u8, trackNum
 	
 }
 
-pub async fn playLargeFolder(tx: &mut UartTx<'static, UART1>, folderNum: u8, trackNum: u16) -> Result<(), ()> {
+pub async fn playLargeFolder(tx: &mut UartTx<'static, UART1>, folderNum: u8, track_num: u16) -> Result<(), ()> {
 
-    let arg: u16 = ((folderNum as u16) << 12) | (trackNum & 0xfff);
+    let arg: u16 = ((folderNum as u16) << 12) | (track_num & 0xfff);
     
     let m = Message{
-	commandValue: SPEC_TRACK_3000,
-	feedbackValue: FEEDBACK,
-	paramMSB: (arg >> 8) as u8,
-	paramLSB: (arg & 0xff) as u8,
+	command_value: SPEC_TRACK_3000,
+	feedback_value: FEEDBACK,
+	param_msb: (arg >> 8) as u8,
+	param_lsb: (arg & 0xff) as u8,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -542,15 +564,13 @@ pub async fn volumeAdjustSet(tx: &mut UartTx<'static, UART1>, gain: u8) -> Resul
     if gain <= 31 {
 		
 	let m = Message{
-	    commandValue: VOL_ADJ,
-	    feedbackValue: FEEDBACK,
-	    paramMSB: 0,
-	    paramLSB: VOL_ADJUST + gain,
+	    command_value: VOL_ADJ,
+	    feedback_value: FEEDBACK,
+	    param_msb: 0,
+	    param_lsb: VOL_ADJUST + gain,
 	};
 	
 	let buff = m.into_buffer();
-	
-	log::info!("Enviando {:x?}",buff);
 	tx.write_bytes(&buff).map_err(|_why| () )?;
 	embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
 	
@@ -566,15 +586,14 @@ pub async fn volumeAdjustSet(tx: &mut UartTx<'static, UART1>, gain: u8) -> Resul
 pub async fn startRepeatPlay(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: REPEAT_PLAY,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: START_REPEAT,
+	command_value: REPEAT_PLAY,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: START_REPEAT,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -585,15 +604,14 @@ pub async fn startRepeatPlay(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> 
 pub async fn stopRepeatPlay(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: REPEAT_PLAY,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: STOP_REPEAT,
+	command_value: REPEAT_PLAY,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: STOP_REPEAT,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -604,15 +622,14 @@ pub async fn stopRepeatPlay(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 pub async fn repeatFolder(tx: &mut UartTx<'static, UART1>, folder: u16) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: REPEAT_FOLDER,
-	feedbackValue: FEEDBACK,
-	paramMSB: ((folder >> 8) & 0xFF) as u8,
-	paramLSB: (folder & 0xFF) as u8,
+	command_value: REPEAT_FOLDER,
+	feedback_value: FEEDBACK,
+	param_msb: ((folder >> 8) & 0xFF) as u8,
+	param_lsb: (folder & 0xFF) as u8,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -623,15 +640,14 @@ pub async fn repeatFolder(tx: &mut UartTx<'static, UART1>, folder: u16) -> Resul
 pub async fn randomAll(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: RANDOM_ALL,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 0,
+	command_value: RANDOM_ALL,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 0,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -639,18 +655,18 @@ pub async fn randomAll(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 	
 }
 
+#[allow(dead_code)]
 pub async fn startRepeat(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: REPEAT_CURRENT,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 0,
+	command_value: REPEAT_CURRENT,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 0,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -658,18 +674,18 @@ pub async fn startRepeat(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 	
 }
 
+#[allow(dead_code)]
 pub async fn stopRepeat(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: REPEAT_CURRENT,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: REPEAT_CURRENT,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -677,18 +693,18 @@ pub async fn stopRepeat(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 	
 }
 
+#[allow(dead_code)]
 pub async fn startDAC(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: SET_DAC,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 0,
+	command_value: SET_DAC,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 0,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -697,18 +713,18 @@ pub async fn startDAC(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 }
 
 
+#[allow(dead_code)]
 pub async fn stopDAC(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
     let m = Message{
-	commandValue: SET_DAC,
-	feedbackValue: FEEDBACK,
-	paramMSB: 0,
-	paramLSB: 1,
+	command_value: SET_DAC,
+	feedback_value: FEEDBACK,
+	param_msb: 0,
+	param_lsb: 1,
     };
     
     let buff = m.into_buffer();
     
-    log::info!("Enviando {:x?}",buff);
     tx.write_bytes(&buff).map_err(|_why| () )?;
     embedded_io_async::Write::flush(tx).await.map_err(|_why| () )?;
     
@@ -718,13 +734,14 @@ pub async fn stopDAC(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 
 pub async fn sleep(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
-    playbackSource(tx, SLEEP).await
+    playback_source(tx, SLEEP).await
 	
 }
 
+#[allow(dead_code)]
 pub async fn wakeUp(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     
-    playbackSource(tx, TF).await
+    playback_source(tx, TF).await
 	
 }
 
