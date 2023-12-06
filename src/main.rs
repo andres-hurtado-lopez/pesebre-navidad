@@ -44,7 +44,14 @@ use esp32c3_hal::{
     uart::{
 	Uart,UartRx,UartTx,TxRxPins,
     }
- };
+};
+
+use picoserve::{
+    response::DebugValue,
+    routing::{get, parse_path_segment},
+};
+use picoserve::extract::State;
+use embassy_sync::mutex::Mutex;
 
 
 mod dfplayer_mini;
@@ -143,6 +150,30 @@ async fn main(spawner: Spawner) {
         seed
     ));
 
+
+    fn make_app() -> picoserve::Router<AppRouter, AppState> {
+        picoserve::Router::new()
+            .route("/", get(|| async move { "Hello World" }))
+            .route(
+                ("/reproducir", parse_path_segment::<u16>()),
+                get(
+                    |cancion| async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			sender.send(cancion).await;
+                        log::info!("Cancion solicitada {cancion}");
+                    },
+                ),
+            )
+    }
+    
+    let web_app = make_static!(make_app());
+
+    let webserver_config = make_static!(picoserve::Config {
+        start_read_request_timeout: Some(Duration::from_secs(5)),
+        read_request_timeout: Some(Duration::from_secs(1)),
+    });
+
     if let Err(why) = spawner.spawn(connection(controller)) {
 	log::error!("Failed spawning 'connection' task: {why:?}");
     }
@@ -151,8 +182,8 @@ async fn main(spawner: Spawner) {
 	log::error!("Failed spawning 'net_task' task: {why:?}");
     }
     
-    if let Err(why) = spawner.spawn(socket_task(&stack)){
-	log::error!("Failed spawning 'socket_task' task: {why:?}");
+    if let Err(why) = spawner.spawn(web_task(&stack, web_app, webserver_config)){
+	log::error!("Failed spawning 'web_task' task: {why:?}");
     }
     
     if let Err(why) = spawner.spawn(loop_luces(led)){
@@ -238,9 +269,53 @@ async fn loop_luces(mut io12: GpioPin<Output<PushPull>, 12>) {
     
 }
 
+struct EmbassyTimer;
+
+impl picoserve::Timer for EmbassyTimer {
+    type Duration = embassy_time::Duration;
+    type TimeoutError = embassy_time::TimeoutError;
+
+    async fn run_with_timeout<F: core::future::Future>(
+        &mut self,
+        duration: Self::Duration,
+        future: F,
+    ) -> Result<F::Output, Self::TimeoutError> {
+        embassy_time::with_timeout(duration, future).await
+    }
+}
+
+#[derive(Clone, Copy)]
+struct SharedControl;
+struct ParseSharedControl;
+
+use core::str::FromStr;
+impl FromStr for SharedControl {
+    type Err = ParseSharedControl;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+	log::info!("shared state generation {s}");
+	Ok(SharedControl)
+    }
+}
+
+struct AppState {
+    shared_control: SharedControl,
+}
+
+impl picoserve::extract::FromRef<AppState> for SharedControl {
+    fn from_ref(state: &AppState) -> Self {
+        state.shared_control
+    }
+}
+
+type AppRouter = impl picoserve::routing::PathRouter<AppState>;
 
 #[embassy_executor::task]
-async fn socket_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>){
+async fn web_task(
+    stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
+    app: &'static picoserve::Router<AppRouter, AppState>,
+    config: &'static picoserve::Config<Duration>,
+){
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
 
@@ -256,7 +331,6 @@ async fn socket_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>){
     let mut socket = TcpSocket::new(&stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-    let sender = CHANNEL.sender();
     
     loop {
         log::info!("Waiting for incomming HTTP connection...");
@@ -273,57 +347,28 @@ async fn socket_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>){
             continue;
         }
 
-        use embedded_io_async::Write;
+	let (socket_rx, socket_tx) = socket.split();
 
-        let mut buffer = [0u8; 1024];
-        let mut pos = 0;
-        loop {
-            match socket.read(&mut buffer).await {
-                Ok(0) => {
-                    log::info!("read EOF");
-                    break;
-                }
-                Ok(len) => {
-                    let to_print = core::str::from_utf8(&buffer[..(pos + len)]).unwrap();
-
-                    if to_print.contains("\r\n\r\n") {
-                        log::info!("BEGIN:{}:END", to_print);
-
-                        break;
-                    }
-
-                    pos += len;
-                }
-                Err(e) => {
-                    log::error!("read error: {:?}", e);
-                    break;
-                }
-            };
+        match picoserve::serve_with_state(
+            app,
+            EmbassyTimer,
+            config,
+            &mut [0; 2048],
+            socket_rx,
+            socket_tx,
+            &AppState{shared_control: SharedControl},
+        )
+        .await
+        {
+            Ok(handled_requests_count) => {
+                log::info!(
+                    "{handled_requests_count} requests handled from {:?}",
+                    socket.remote_endpoint()
+                );
+            }
+            Err(err) => log::error!("{err:?}"),
         }
-
-        let r = socket
-            .write_all(
-                b"HTTP/1.0 200 OK\r\n\r\n\
-		  <html>\
-                  <body>\
-                  <h1>Hello Rust! Hello esp-wifi!</h1>\
-                  </body>\
-		  </html>\r\n\
-		  ",
-            )
-            .await;
-
-	log::info!("Sending song 4 to MP3 player");
-	sender.send(4).await;
-
-        if let Err(e) = r {
-            log::error!("write error: {:?}", e);
-        }
-
-        let r = socket.flush().await;
-        if let Err(e) = r {
-            log::error!("flush error: {:?}", e);
-        }
+	
         Timer::after(Duration::from_millis(1000)).await;
 
         socket.close();
