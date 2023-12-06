@@ -176,7 +176,7 @@ pub async fn playPrevious(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 pub async fn play(tx: &mut UartTx<'static, UART1>, trackNum : u16) -> Result<(), ()> {
     
     let m = Message {
-	commandValue: PREV,
+	commandValue: PLAY,
 	feedbackValue: FEEDBACK,
 	paramMSB: ((trackNum >> 8) & 0xFF) as u8,
 	paramLSB: (trackNum & 0xFF) as u8,

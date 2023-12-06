@@ -68,11 +68,9 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
     dfplayer_mini::volume(&mut tx, volume).await.unwrap();
     Timer::after(Duration::from_millis(2000)).await;
 
-    log::info!("Playing MP3 into sound");
-    dfplayer_mini::r#play(&mut tx, 36).await.unwrap();
-    Timer::after(Duration::from_millis(2000)).await;
 
-    dfplayer_mini::r#resume(&mut tx).await.unwrap();
+    log::info!("Set playback location to song 36");
+    dfplayer_mini::play(&mut tx, 36).await.unwrap();
     Timer::after(Duration::from_millis(2000)).await;
 
     let receiver = CHANNEL.receiver();
@@ -81,7 +79,7 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
 	log::info!("Awaiting for request for MP3 playback from channel incomming from HTTP");
 	let song = receiver.receive().await;
 	log::info!("Playin MP3 file  #{song}");
-	dfplayer_mini::r#play(&mut tx, song).await.unwrap();
+	dfplayer_mini::play(&mut tx, song).await.unwrap();
 	Timer::after(Duration::from_millis(1000)).await;
     }
 }
