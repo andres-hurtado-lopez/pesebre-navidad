@@ -232,7 +232,7 @@ async fn main(spawner: Spawner) {
     ));
 
 
-    fn make_app() -> picoserve::Router<AppRouter, AppState> {
+    fn make_app() -> picoserve::Router<AppRouter,()> {
         picoserve::Router::new()
 	    .route(
 		"/",
@@ -391,7 +391,7 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
 		    dfplayer_mini::inc_volume(&mut tx).await.unwrap();
 		}
 		ControlMessages::DecVol => {
-		    log::info!("MP3 Vol incremented");
+		    log::info!("MP3 Vol decremented");
 		    dfplayer_mini::dec_volume(&mut tx).await.unwrap();
 		}
 		_=>{
@@ -486,12 +486,12 @@ impl picoserve::extract::FromRef<AppState> for SharedControl {
     }
 }
 
-type AppRouter = impl picoserve::routing::PathRouter<AppState>;
+type AppRouter = impl picoserve::routing::PathRouter<()>;
 
 #[embassy_executor::task]
 async fn web_task(
     stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
-    app: &'static picoserve::Router<AppRouter, AppState>,
+    app: &'static picoserve::Router<AppRouter>,
     config: &'static picoserve::Config<Duration>,
 ){
     let mut rx_buffer = [0; 1536];
@@ -527,14 +527,13 @@ async fn web_task(
 
 	let (socket_rx, socket_tx) = socket.split();
 
-        match picoserve::serve_with_state(
+        match picoserve::serve(
             app,
             EmbassyTimer,
             config,
-            &mut [0; 15*1024],
+            &mut [0; 2048],
             socket_rx,
             socket_tx,
-            &AppState{shared_control: SharedControl},
         )
         .await
         {
