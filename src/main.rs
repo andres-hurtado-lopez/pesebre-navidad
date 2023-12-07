@@ -26,6 +26,7 @@ use embassy_time::{with_timeout, Duration, Timer};
 use embassy_sync::{
     //blocking_mutex::raw::NoopRawMutex,
     channel::{Channel},
+    mutex::Mutex,
     blocking_mutex::raw::CriticalSectionRawMutex
 };
 
@@ -51,13 +52,14 @@ use picoserve::{
     routing::{get, parse_path_segment},
 };
 use picoserve::extract::State;
-use embassy_sync::mutex::Mutex;
 
 
 mod dfplayer_mini;
 
 const READ_BUF_SIZE: usize = 10;
+const WEB_TASK_POOL_SIZE : usize = 8;
 static CHANNEL: Channel<CriticalSectionRawMutex, ControlMessages, 10> = Channel::new();
+static VOLUME : Mutex<CriticalSectionRawMutex,u8> = Mutex::new(25);
 
 macro_rules! back_to_enum {
     ($(#[$meta:meta])* $vis:vis enum $name:ident {
@@ -217,7 +219,8 @@ async fn main(spawner: Spawner) {
 
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        //gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+	gateway: None,
         dns_servers: Default::default(),
     });
 
@@ -227,7 +230,7 @@ async fn main(spawner: Spawner) {
     let stack = &*make_static!(Stack::new(
         wifi_interface,
         config,
-        make_static!(StackResources::<3>::new()),
+        make_static!(StackResources::<WEB_TASK_POOL_SIZE>::new()),
         seed
     ));
 
@@ -318,8 +321,8 @@ async fn main(spawner: Spawner) {
     let web_app = make_static!(make_app());
 
     let webserver_config = make_static!(picoserve::Config {
-        start_read_request_timeout: Some(Duration::from_secs(5)),
-        read_request_timeout: Some(Duration::from_secs(1)),
+        start_read_request_timeout: Some(Duration::from_secs(15)),
+        read_request_timeout: Some(Duration::from_secs(10)),
     });
 
     if let Err(why) = spawner.spawn(connection(controller)) {
@@ -329,11 +332,7 @@ async fn main(spawner: Spawner) {
     if let Err(why) = spawner.spawn(net_task(&stack)) {
 	log::error!("Failed spawning 'net_task' task: {why:?}");
     }
-    
-    if let Err(why) = spawner.spawn(web_task(&stack, web_app, webserver_config)){
-	log::error!("Failed spawning 'web_task' task: {why:?}");
-    }
-    
+        
     if let Err(why) = spawner.spawn(loop_luces(led)){
 	log::error!("Failed spawning 'loop_luces' task: {why:?}");
     }
@@ -344,7 +343,13 @@ async fn main(spawner: Spawner) {
 	log::error!("Failed spawning 'writer' task: {why:?}");
     }
 
-    
+    for id in 0..WEB_TASK_POOL_SIZE {
+
+	if let Err(why) = spawner.spawn(web_task(&stack, web_app, webserver_config)){
+	    log::error!("Failed spawning 'web_task' ID: {id} task: {why:?}");
+	}
+    }
+
 
 }
 
@@ -388,11 +393,16 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
 		}
 		ControlMessages::IncVol => {
 		    log::info!("MP3 Vol incremented");
-		    dfplayer_mini::inc_volume(&mut tx).await.unwrap();
+		    let mut v = VOLUME.lock().await;
+		    *v = *v + 1;
+		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
 		}
 		ControlMessages::DecVol => {
 		    log::info!("MP3 Vol decremented");
-		    dfplayer_mini::dec_volume(&mut tx).await.unwrap();
+		    let mut v = VOLUME.lock().await;
+		    *v = *v - 1;
+
+		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
 		}
 		_=>{
 		    log::info!("MP3 command not recognized {message:?}");
@@ -488,7 +498,7 @@ impl picoserve::extract::FromRef<AppState> for SharedControl {
 
 type AppRouter = impl picoserve::routing::PathRouter<()>;
 
-#[embassy_executor::task]
+#[embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE)]
 async fn web_task(
     stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
     app: &'static picoserve::Router<AppRouter>,
