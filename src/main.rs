@@ -57,9 +57,90 @@ use embassy_sync::mutex::Mutex;
 mod dfplayer_mini;
 
 const READ_BUF_SIZE: usize = 10;
-static CHANNEL: Channel<CriticalSectionRawMutex, u16, 10> = Channel::new();
+static CHANNEL: Channel<CriticalSectionRawMutex, ControlMessages, 10> = Channel::new();
 
+macro_rules! back_to_enum {
+    ($(#[$meta:meta])* $vis:vis enum $name:ident {
+        $($(#[$vmeta:meta])* $vname:ident $(= $val:expr)?,)*
+    }) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $($(#[$vmeta])* $vname $(= $val)?,)*
+        }
 
+        impl core::convert::TryFrom<u16> for $name {
+            type Error = ();
+
+            fn try_from(v: u16) -> Result<Self, Self::Error> {
+                match v {
+                    $(x if x == $name::$vname as u16 => Ok($name::$vname),)*
+                    _ => Err(()),
+                }
+            }
+        }
+    }
+}
+
+back_to_enum!{
+    #[derive(Debug)]
+    enum ControlMessages{
+	ALaNanitaNana_001 = 1,
+	ABelenPastores_002 = 2,
+	AntonTiruriru_003 = 3,
+	CampanaSobreCampana_004 = 4,
+	CielitoLindo_005 = 5,
+	ElBurritoSabanero_006 = 6,
+	ElNinodelCarpintero_007 = 7,
+	ElTamborilero_008 = 8,
+	HaNacidoelNino_009 = 9,
+	NinodelAlma_010 = 10,
+	PastoresVenid_011 = 11,
+	SalveReinayMadre_012 = 12,
+	Tutaina_013 = 13,
+	VamosVamosPastorcitos_014 = 14,
+	YaNacioelNino_015 = 15,
+	YaVieneelNinito_016 = 16,
+	YoSoyVicentico_017 = 17,
+	Zagalillos_018 = 18,
+	Jinglela14navidad_019 = 19,
+	AguilaRojacomercial_020 = 20,
+	JingleNavidadCaracolRadio_021 = 21,
+	JingleNavidadRCNRadio_022 = 22,
+	SonidodeVaca_023 = 23,
+	SonidodeOveja_024 = 24,
+	SonidodeAves_025 = 25,
+	AguadeRíoFluyendo_026 = 26,
+	NovenaDeAguinaldosDia1_027 = 27,
+	NovenaDeAguinaldosDia2_028 = 28,
+	NovenaDeAguinaldosDia3_029 = 29,
+	NovenaDeAguinaldosDia4_030 = 30,
+	NovenaDeAguinaldosDia5_031 = 31,
+	NovenaDeAguinaldosDia6_032 = 32,
+	NovenaDeAguinaldosDia7_033 = 33,
+	NovenaDeAguinaldosDia8_034 = 34,
+	NovenaDeAguinaldosDia9_035 = 35,
+	Historia_navidad_036 = 36,
+	Bienvenida_037 = 37,
+	Pause = 38,
+	Resume = 39,
+	Stop = 40,
+	IncVol = 41,
+	DecVol = 42,
+    }
+}
+
+impl ControlMessages {
+    fn is_command(&self) -> bool{
+	match self{
+	    Self::Pause => true,
+	    Self::Resume => true,
+	    Self::Stop => true,
+	    Self::IncVol => true,
+	    Self::DecVol => true,
+	    _ => false,
+	}
+    }
+}
 
 #[main]
 async fn main(spawner: Spawner) {
@@ -153,18 +234,85 @@ async fn main(spawner: Spawner) {
 
     fn make_app() -> picoserve::Router<AppRouter, AppState> {
         picoserve::Router::new()
-            .route("/", get(|| async move { "Hello World" }))
+	    .route(
+		"/",
+		get(|| picoserve::response::File::html(include_str!("index.html")))
+	    )
             .route(
                 ("/reproducir", parse_path_segment::<u16>()),
                 get(
                     |cancion| async move {
                         //control.lock().await.gpio_set(0, led_is_on).await;
 			let sender = CHANNEL.sender();
-			sender.send(cancion).await;
-                        log::info!("Cancion solicitada {cancion}");
+			if let Ok(cancion) = ControlMessages::try_from(cancion){
+			    log::info!("Cancion solicitada {cancion:?}");
+			    sender.send(cancion).await;
+			}
+			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
+	    .route(
+                ("/pause",),
+                get(
+                    || async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			log::info!("pause solicitado");
+			sender.send(ControlMessages::Pause).await;
+			picoserve::response::Redirect::to("/")
+                    },
+                ),
+            )
+	    .route(
+                ("/stop",),
+                get(
+                    || async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			log::info!("pause solicitado");
+			sender.send(ControlMessages::Stop).await;
+			picoserve::response::Redirect::to("/")
+                    },
+                ),
+            )
+	    .route(
+                ("/resume",),
+                get(
+                    || async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			log::info!("pause solicitado");
+			sender.send(ControlMessages::Resume).await;
+			picoserve::response::Redirect::to("/")
+                    },
+                ),
+            )
+	    .route(
+                ("/inc-vol",),
+                get(
+                    || async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			log::info!("increment vol requested");
+			sender.send(ControlMessages::IncVol).await;
+			picoserve::response::Redirect::to("/")
+                    },
+                ),
+            )
+	    .route(
+                ("/dev-vol",),
+                get(
+                    || async move {
+                        //control.lock().await.gpio_set(0, led_is_on).await;
+			let sender = CHANNEL.sender();
+			log::info!("decrement vol requested");
+			sender.send(ControlMessages::DecVol).await;
+			picoserve::response::Redirect::to("/")
+                    },
+                ),
+            )
+
     }
     
     let web_app = make_static!(make_app());
@@ -223,9 +371,39 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
     
     loop {
 	log::info!("Awaiting for request for MP3 playback from channel incomming from HTTP");
-	let song = receiver.receive().await;
-	log::info!("Playin MP3 file  #{song}");
-	dfplayer_mini::play(&mut tx, song).await.unwrap();
+	let message = receiver.receive().await;
+	if message.is_command() {
+	    match message{
+		ControlMessages::Pause => {
+		    log::info!("MP3 Paused");
+		    dfplayer_mini::pause(&mut tx).await.unwrap();
+		},
+		ControlMessages::Resume => {
+		    log::info!("MP3 Resumed");
+		    dfplayer_mini::resume(&mut tx).await.unwrap();
+		}
+		ControlMessages::Stop => {
+		    log::info!("MP3 Stopped");
+		    dfplayer_mini::stop(&mut tx).await.unwrap();
+		}
+		ControlMessages::IncVol => {
+		    log::info!("MP3 Vol incremented");
+		    dfplayer_mini::inc_volume(&mut tx).await.unwrap();
+		}
+		ControlMessages::DecVol => {
+		    log::info!("MP3 Vol incremented");
+		    dfplayer_mini::dec_volume(&mut tx).await.unwrap();
+		}
+		_=>{
+		    log::info!("MP3 command not recognized {message:?}");
+		}
+	    }
+	} else {
+	    let song = message as u16;
+	    log::info!("Playin MP3 file  #{song}");
+	    dfplayer_mini::play(&mut tx, song).await.unwrap();
+
+	}
 	Timer::after(Duration::from_millis(1000)).await;
     }
 }
@@ -353,7 +531,7 @@ async fn web_task(
             app,
             EmbassyTimer,
             config,
-            &mut [0; 2048],
+            &mut [0; 15*1024],
             socket_rx,
             socket_tx,
             &AppState{shared_control: SharedControl},
@@ -369,11 +547,7 @@ async fn web_task(
             Err(err) => log::error!("{err:?}"),
         }
 	
-        Timer::after(Duration::from_millis(1000)).await;
-
         socket.close();
-        Timer::after(Duration::from_millis(1000)).await;
-
         socket.abort();
     }
 }

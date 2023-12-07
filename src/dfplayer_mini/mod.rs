@@ -488,7 +488,7 @@ pub async fn reset(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 pub async fn resume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
 	command_value: PLAYBACK,
-	feedback_value: FEEDBACK,
+	feedback_value: NO_FEEDBACK,
 	param_msb: 0,
 	param_lsb: 1,
     };
@@ -505,7 +505,7 @@ pub async fn resume(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
 pub async fn pause(tx: &mut UartTx<'static, UART1>) -> Result<(), ()> {
     let m = Message{
 	command_value: PAUSE,
-	feedback_value: FEEDBACK,
+	feedback_value: NO_FEEDBACK,
 	param_msb: 0,
 	param_lsb: 1,
     };
