@@ -23,36 +23,108 @@
       ul {list-style-type: disclosure-closed;}
       li {padding: .4em 0 .4em 2em;border: 1px solid;width: 10em;}
     </style>
+    <script>
+
+      function reproducir(song)  {
+	  fetch(`reproducir/${song}`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+
+      function inc_vol(song)  {
+	  fetch(`inc-vol`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+
+      function dec_vol(song)  {
+	  fetch(`dec-vol`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+
+      function pause(song)  {
+	  fetch(`pause`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+
+      function stop(song)  {
+	  fetch(`stop`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+
+      function resume(song)  {
+	  fetch(`resume`, {
+	      method: 'GET',
+	  }).then(x=>{
+	      console.log(`target ${x}`);
+	  });
+      }
+      
+    </script>
   </head>
 
   <body>
     <div class="container">
       <h1>Pesebre Navideño</h1>
       <div class="actions">
-	<a class="btn" href="pause">Pause</a>
-	<a class="btn" href="stop">Stop</a>
-	<a class="btn" href="resume">Play</a>
+	<a class="btn" onclick="pause()">Pause</a>
+	<a class="btn" onclick="stop()">Stop</a>
+	<a class="btn" onclick="resume()">Play</a>
       </div>
       <div class="actions">
-	<a class="btn" href="inc-vol">Vol+</a>
-	<a class="btn" href="dev-vol">Vol-</a>
+	<a class="btn" onclick="inc_vol()">Vol+</a>
+	<a class="btn" onclick="dec_vol()">Vol-</a>
       </div>
       <h2>Novena de Aguinaldos</h2>
       <ul class="menu_list">
-	<li><a href="reproducir/27">Primer Dia</a></li>
-	<li><a href="reproducir/28">Segundo Dia</a></li>
-	<li><a href="reproducir/29">Tercer Dia</a></li>
-	<li><a href="reproducir/30">Cuarto Dia</a></li>
-	<li><a href="reproducir/31">Quinto Dia</a></li>
-	<li><a href="reproducir/32">Sexto Dia</a></li>
-	<li><a href="reproducir/33">Septimo Dia</a></li>
-	<li><a href="reproducir/34">Octavo Dia</a></li>
-	<li><a href="reproducir/35">Noveno Dia</a></li>
+	<li onclick="reproducir(27)">Primer Dia</li>
+	<li onclick="reproducir(28)">Segundo Dia</a></li>
+	<li onclick="reproducir(29)">Tercer Dia</a></li>
+	<li onclick="reproducir(30)">Cuarto Dia</a></li>
+	<li onclick="reproducir(31)">Quinto Dia</a></li>
+	<li onclick="reproducir(32)">Sexto Dia</a></li>
+	<li onclick="reproducir(33)">Septimo Dia</a></li>
+	<li onclick="reproducir(34)">Octavo Dia</a></li>
+	<li onclick="reproducir(35)">Noveno Dia</a></li>
       </ul>
       <h2>Villancicos</h2>
       <ul class="menu_list">
-	<li><a href="reproducir/1">A La Nanita Nana</a></li>
-	<li><a href="reproducir/2">A Belen Pastores</a></li>
+	<li><a onclick="reproducir(1)">A La Nanita Nana</a></li>
+	<li><a onclick="reproducir(2)">A Belen Pastores</a></li>
+	<li><a onclick="reproducir(3)">Anton Tiruriru</a></li>
+	<li><a onclick="reproducir(4)">Campana Sobre Campana</a></li>
+	<li><a onclick="reproducir(5)">Cielito Lindo</a></li>
+	<li><a onclick="reproducir(6)">El Burrito Sabanero</a></li>
+	<li><a onclick="reproducir(7)">El Nino del Carpintero</a></li>
+	<li><a onclick="reproducir(8)">El Tamborilero</a></li>
+	<li><a onclick="reproducir(9)">Ha Nacido el Nino</a></li>
+	<li><a onclick="reproducir(10)">Nino del Alma</a></li>
+	<li><a onclick="reproducir(11)">Pastores Venid</a></li>
+	<li><a onclick="reproducir(12)">Salve Reina y Madre</a></li>
+	<li><a onclick="reproducir(13)">Tutaina</a></li>
+	<li><a onclick="reproducir(14)">Vamos Vamos Pastorcitos</a></li>
+	<li><a onclick="reproducir(15)">Ya Nacio el Nino</a></li>
+	<li><a onclick="reproducir(16)">Ya Viene el Ninito</a></li>
+	<li><a onclick="reproducir(17)">Yo Soy Vicentico</a></li>
+	<li><a onclick="reproducir(18)">Zagalillos</a></li>
+	<li><a onclick="reproducir(19)">jingle la 14 navidad</a></li>
+	<li><a onclick="reproducir(20)">Aguila Roja comercial</a></li>
+	<li><a onclick="reproducir(21)">Jingle Navidad Caracol Radio</a></li>
+	<li><a onclick="reproducir(22)">Jingle Navidad RCN Radio</a></li>
+	
       </ul>
     </div>
   </body>

@@ -222,7 +222,7 @@ async fn main(spawner: Spawner) {
     
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 150])),
         dns_servers: dnss,
     });
 
@@ -306,7 +306,7 @@ async fn main(spawner: Spawner) {
                 ),
             )
 	    .route(
-                ("/dev-vol",),
+                ("/dec-vol",),
                 get(
                     || async move {
                         //control.lock().await.gpio_set(0, led_is_on).await;
@@ -368,9 +368,9 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
     dfplayer_mini::playback_source(&mut tx, 2).await.unwrap();
     Timer::after(Duration::from_millis(2000)).await;
 
-    let volume = 25;
-    log::info!("Set MP3 playback volume to '{volume}'");
-    dfplayer_mini::volume(&mut tx, volume).await.unwrap();
+    let volume = VOLUME.lock().await;
+    log::info!("Set MP3 playback volume to '{}'",*volume);
+    dfplayer_mini::volume(&mut tx, *volume).await.unwrap();
     Timer::after(Duration::from_millis(2000)).await;
 
 
@@ -534,7 +534,6 @@ async fn dns_server(
 	
 	match socket.recv_from(&mut dns_request).await{
 	    Ok((size, _req_add)) => {
-		log::info!("incomming DNS request. size {size} from: {_req_add}");
 		dns_request.iter().enumerate().for_each(|(i,x)| dns_response[i] = *x);
 
 		
@@ -542,24 +541,15 @@ async fn dns_server(
 		    Ok(mut message) => {
 
 			for question in message.questions(){
-			    log::info!("incomming DNS name decoded: {name}",name=question.name());
+			    
 			    let mut new_header = message.header().clone();
 			    let mut answer;
 			    let mut response_code = dnsparse::ResponseCode::NoError;
-			    
-			    if question.name() == "pesebre-navideño.local" {
-				
-				answer = dnsparse::Answer{
-				    name: question.name().clone(),
-				    kind: dnsparse::QueryKind::A,
-				    class: dnsparse::QueryClass::IN,
-				    ttl: 60,
-				    rdata: &[192u8,168,2,1],
-				};
-				response_code = dnsparse::ResponseCode::NoError;
-				
-			    } else if question.name() == "connectivitycheck.gstatic.com" {
+			    let test_name = "control-panel.pesebre.co";
+			    if question.name() == test_name {
 
+				
+				
 				answer = dnsparse::Answer{
 				    name: question.name().clone(),
 				    kind: dnsparse::QueryKind::A,
@@ -568,8 +558,9 @@ async fn dns_server(
 				    rdata: &[192u8,168,2,1],
 				};
 				response_code = dnsparse::ResponseCode::NoError;
+				log::info!("incomming DNS name decoded: {name}. question {question:?}",name=question.name());
 				
-			    }else {
+			    } else {
 
 				answer = dnsparse::Answer{
 				    name: question.name().clone(),
@@ -578,13 +569,13 @@ async fn dns_server(
 				    ttl: 60,
 				    rdata: &[192u8,168,1,150],
 				};
-				response_code = dnsparse::ResponseCode::BadName;
+				response_code = dnsparse::ResponseCode::NoError;
 			    }
 
 			    let mut new_message = dnsparse::Message::builder(&mut dns_response).build();
 			    new_message.header_mut().set_response_code(response_code);
 			    new_message.add_answer(&answer);
-			    socket.send_to(message.as_bytes(), _req_add);
+			    socket.send_to(message.as_bytes(), _req_add).await;
 			    break;
 			    
 			}
