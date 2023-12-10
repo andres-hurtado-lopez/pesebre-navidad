@@ -194,9 +194,6 @@ async fn main(spawner: Spawner) {
 	Some(uart_pins),
 	&clocks);
 
-    //uart1
-        //.set_rx_fifo_full_threshold(READ_BUF_SIZE as u16)
-        //.unwrap();
     let (tx, rx) = uart1.split();
 
     esp32c3_hal::interrupt::enable(
@@ -253,7 +250,6 @@ async fn main(spawner: Spawner) {
 			    log::info!("Cancion solicitada {cancion:?}");
 			    sender.send(cancion).await;
 			}
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -265,7 +261,6 @@ async fn main(spawner: Spawner) {
 			let sender = CHANNEL.sender();
 			log::info!("pause solicitado");
 			sender.send(ControlMessages::Pause).await;
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -277,7 +272,6 @@ async fn main(spawner: Spawner) {
 			let sender = CHANNEL.sender();
 			log::info!("pause solicitado");
 			sender.send(ControlMessages::Stop).await;
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -289,7 +283,6 @@ async fn main(spawner: Spawner) {
 			let sender = CHANNEL.sender();
 			log::info!("pause solicitado");
 			sender.send(ControlMessages::Resume).await;
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -301,7 +294,6 @@ async fn main(spawner: Spawner) {
 			let sender = CHANNEL.sender();
 			log::info!("increment vol requested");
 			sender.send(ControlMessages::IncVol).await;
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -313,7 +305,6 @@ async fn main(spawner: Spawner) {
 			let sender = CHANNEL.sender();
 			log::info!("decrement vol requested");
 			sender.send(ControlMessages::DecVol).await;
-			picoserve::response::Redirect::to("/")
                     },
                 ),
             )
@@ -371,6 +362,7 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
     let volume = VOLUME.lock().await;
     log::info!("Set MP3 playback volume to '{}'",*volume);
     dfplayer_mini::volume(&mut tx, *volume).await.unwrap();
+    drop(volume);
     Timer::after(Duration::from_millis(2000)).await;
 
 
@@ -400,14 +392,19 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
 		ControlMessages::IncVol => {
 		    let mut v = VOLUME.lock().await;
 		    *v = *v + 1;
-		    log::info!("MP3 Vol incremented {vol}",vol=*v);
-		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
+		    let new_vol = *v;
+		    drop(v);
+		    log::info!("MP3 Vol incremented {new_vol}");
+		    dfplayer_mini::volume(&mut tx, new_vol).await.unwrap();
 		}
 		ControlMessages::DecVol => {
 		    let mut v = VOLUME.lock().await;
 		    *v = *v - 1;
-		    log::info!("MP3 Vol decremented {vol}",vol=*v);
-		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
+		    let new_vol = *v;
+		    drop(v);
+		    log::info!("MP3 Vol decremented {new_vol}");
+		    dfplayer_mini::volume(&mut tx, new_vol).await.unwrap();
+		    
 		}
 		_=>{
 		    log::info!("MP3 command not recognized {message:?}");
