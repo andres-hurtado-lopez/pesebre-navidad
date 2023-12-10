@@ -7,10 +7,11 @@
 use embedded_svc::wifi::{AccessPointConfiguration, Configuration, Wifi};
 
 use embassy_net::tcp::TcpSocket;
+use embassy_net::udp::{UdpSocket, PacketMetadata};
 use embassy_net::{
     Config, IpListenEndpoint, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4,
 };
-
+use heapless::Vec;
 
 use esp_wifi::initialize;
 //use esp_wifi::wifi::utils::create_network_interface;
@@ -57,7 +58,7 @@ use picoserve::extract::State;
 mod dfplayer_mini;
 
 const READ_BUF_SIZE: usize = 10;
-const WEB_TASK_POOL_SIZE : usize = 8;
+const WEB_TASK_POOL_SIZE : usize = 2;
 static CHANNEL: Channel<CriticalSectionRawMutex, ControlMessages, 10> = Channel::new();
 static VOLUME : Mutex<CriticalSectionRawMutex,u8> = Mutex::new(25);
 
@@ -217,11 +218,12 @@ async fn main(spawner: Spawner) {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&wifi_init, wifi, WifiApDevice).unwrap();
 
+    let dnss = Vec::<_,3>::from_slice(&[Ipv4Address::from_bytes(&[192, 168, 2, 1]),Ipv4Address::from_bytes(&[192, 168, 2, 1]),Ipv4Address::from_bytes(&[192, 168, 2, 1])]).unwrap();
+    
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        //gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
-	gateway: None,
-        dns_servers: Default::default(),
+        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        dns_servers: dnss,
     });
 
     let seed = 1234; // very random, very secure seed
@@ -230,7 +232,7 @@ async fn main(spawner: Spawner) {
     let stack = &*make_static!(Stack::new(
         wifi_interface,
         config,
-        make_static!(StackResources::<WEB_TASK_POOL_SIZE>::new()),
+        make_static!(StackResources::<{WEB_TASK_POOL_SIZE + 1}>::new()),
         seed
     ));
 
@@ -332,7 +334,11 @@ async fn main(spawner: Spawner) {
     if let Err(why) = spawner.spawn(net_task(&stack)) {
 	log::error!("Failed spawning 'net_task' task: {why:?}");
     }
-        
+
+    if let Err(why) = spawner.spawn(dns_server(&stack)) {
+	log::error!("Failed spawning 'connection' task: {why:?}");
+    }
+    
     if let Err(why) = spawner.spawn(loop_luces(led)){
 	log::error!("Failed spawning 'loop_luces' task: {why:?}");
     }
@@ -392,16 +398,15 @@ async fn writer(mut tx: UartTx<'static, UART1>) {
 		    dfplayer_mini::stop(&mut tx).await.unwrap();
 		}
 		ControlMessages::IncVol => {
-		    log::info!("MP3 Vol incremented");
 		    let mut v = VOLUME.lock().await;
 		    *v = *v + 1;
+		    log::info!("MP3 Vol incremented {vol}",vol=*v);
 		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
 		}
 		ControlMessages::DecVol => {
-		    log::info!("MP3 Vol decremented");
 		    let mut v = VOLUME.lock().await;
 		    *v = *v - 1;
-
+		    log::info!("MP3 Vol decremented {vol}",vol=*v);
 		    dfplayer_mini::volume(&mut tx, *v).await.unwrap();
 		}
 		_=>{
@@ -498,6 +503,106 @@ impl picoserve::extract::FromRef<AppState> for SharedControl {
 
 type AppRouter = impl picoserve::routing::PathRouter<()>;
 
+#[embassy_executor::task]
+async fn dns_server(
+        stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
+){
+    let mut rx_buffer = [0; 512];
+    let mut tx_buffer = [0; 512];
+
+    let mut rx_meta: [PacketMetadata; 300] = [PacketMetadata::EMPTY; 300];
+    let mut tx_meta: [PacketMetadata; 300] = [PacketMetadata::EMPTY; 300];
+
+    loop {
+        if stack.is_link_up() {
+            break;
+        }
+        Timer::after(Duration::from_millis(500)).await;
+    }
+    log::info!("DNS server started!!!");
+
+    let mut socket = UdpSocket::new(&stack, &mut rx_meta, &mut rx_buffer, &mut tx_meta, &mut tx_buffer);
+    
+    loop{
+
+	if !socket.is_open() {
+            socket.bind(IpListenEndpoint::from(53)).unwrap();
+	}
+
+	let mut dns_request = [0u8 ;512];
+	let mut dns_response = [0u8 ;512];
+	
+	match socket.recv_from(&mut dns_request).await{
+	    Ok((size, _req_add)) => {
+		log::info!("incomming DNS request. size {size} from: {_req_add}");
+		dns_request.iter().enumerate().for_each(|(i,x)| dns_response[i] = *x);
+
+		
+		match dnsparse::Message::parse(&mut dns_request){
+		    Ok(mut message) => {
+
+			for question in message.questions(){
+			    log::info!("incomming DNS name decoded: {name}",name=question.name());
+			    let mut new_header = message.header().clone();
+			    let mut answer;
+			    let mut response_code = dnsparse::ResponseCode::NoError;
+			    
+			    if question.name() == "pesebre-navideño.local" {
+				
+				answer = dnsparse::Answer{
+				    name: question.name().clone(),
+				    kind: dnsparse::QueryKind::A,
+				    class: dnsparse::QueryClass::IN,
+				    ttl: 60,
+				    rdata: &[192u8,168,2,1],
+				};
+				response_code = dnsparse::ResponseCode::NoError;
+				
+			    } else if question.name() == "connectivitycheck.gstatic.com" {
+
+				answer = dnsparse::Answer{
+				    name: question.name().clone(),
+				    kind: dnsparse::QueryKind::A,
+				    class: dnsparse::QueryClass::IN,
+				    ttl: 60,
+				    rdata: &[192u8,168,2,1],
+				};
+				response_code = dnsparse::ResponseCode::NoError;
+				
+			    }else {
+
+				answer = dnsparse::Answer{
+				    name: question.name().clone(),
+				    kind: dnsparse::QueryKind::SOA,
+				    class: dnsparse::QueryClass::IN,
+				    ttl: 60,
+				    rdata: &[192u8,168,1,150],
+				};
+				response_code = dnsparse::ResponseCode::BadName;
+			    }
+
+			    let mut new_message = dnsparse::Message::builder(&mut dns_response).build();
+			    new_message.header_mut().set_response_code(response_code);
+			    new_message.add_answer(&answer);
+			    socket.send_to(message.as_bytes(), _req_add);
+			    break;
+			    
+			}
+
+		    },
+		    Err(why) => {
+			log::error!("Failed decoding DNS message: {why:?}");
+		    }
+		}
+	    },
+	    Err(why) => {
+		log::error!("Failed reading UDP DNS Socket: {why:?}");
+	    }
+	}
+    }
+}
+
+
 #[embassy_executor::task(pool_size = WEB_TASK_POOL_SIZE)]
 async fn web_task(
     stack: &'static Stack<WifiDevice<'static, WifiApDevice>>,
@@ -553,7 +658,7 @@ async fn web_task(
                     socket.remote_endpoint()
                 );
             }
-            Err(err) => log::error!("{err:?}"),
+            Err(err) => log::error!("Picoserver error: {err:?}"),
         }
 	
         socket.close();

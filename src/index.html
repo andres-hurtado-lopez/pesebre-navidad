@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 
   <head>
@@ -6,39 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pesebre Navideño</title>
     <style>
-      body {
-	  background: #dedede;
+      body {background: #dedede;font-family: sans-serif;display: flex;flex-direction: column;align-items: center; color:}
+      .container{
+	  border-radius: 23px 23px 23px 23px;
+	  -moz-border-radius: 23px 23px 23px 23px;
+	  -webkit-border-radius: 23px 23px 23px 23px;
+	  border: 2px solid black;
+	  -webkit-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+	  -moz-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+	  box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.75);
+	  padding:1em;
       }
+      .actions {display:flex;gap: 0.5em;margin-bottom: 1em;}
+      a{text-decoration: none;color:black;}
+      a.btn { padding: 0.2em;border: 2px solid;border-radius: 5px;width: 4em;text-decoration:none;text-align: center;}
+      ul {list-style-type: disclosure-closed;}
+      li {padding: .4em 0 .4em 2em;border: 1px solid;width: 10em;}
     </style>
   </head>
 
   <body>
-    <div><h1>Pesebre Navideño</h1></div>
-    <div><a href="pause"><h1>[Pause]</h1></div>
-    <div><a href="stop"><h1>[Stop]</h1></div>
-    <div><a href="resume"><h1>[Play]</h1></div>
-    <div><a href="inc-vol"><h1>[Vol+]</h1></div>
-    <div><a href="dev-vol"><h1>[Vol-]</h1></div>
-    <h2>Novena de Aguinaldos</h2>
-    <ul class="menu_list">
-      <li><a href="reproducir/27">Primer Dia</a></li>
-      <li><a href="reproducir/28">Segundo Dia</a></li>
-      <li><a href="reproducir/29">Tercer Dia</a></li>
-      <li><a href="reproducir/30">Cuarto Dia</a></li>
-      <li><a href="reproducir/31">Quinto Dia</a></li>
-      <li><a href="reproducir/32">Sexto Dia</a></li>
-      <li><a href="reproducir/33">Septimo Dia</a></li>
-      <li><a href="reproducir/34">Octavo Dia</a></li>
-      <li><a href="reproducir/35">Noveno Dia</a></li>
-    </ul>
-    <br/>
-    <br/>
-    <h2>Villancicos</h2>
-    <ul class="menu_list">
-      <li><a href="reproducir/1">A La Nanita Nana</a></li>
-      <li><a href="reproducir/2">A Belen Pastores</a></li>
-    </ul>
-    
+    <div class="container">
+      <h1>Pesebre Navideño</h1>
+      <div class="actions">
+	<a class="btn" href="pause">Pause</a>
+	<a class="btn" href="stop">Stop</a>
+	<a class="btn" href="resume">Play</a>
+      </div>
+      <div class="actions">
+	<a class="btn" href="inc-vol">Vol+</a>
+	<a class="btn" href="dev-vol">Vol-</a>
+      </div>
+      <h2>Novena de Aguinaldos</h2>
+      <ul class="menu_list">
+	<li><a href="reproducir/27">Primer Dia</a></li>
+	<li><a href="reproducir/28">Segundo Dia</a></li>
+	<li><a href="reproducir/29">Tercer Dia</a></li>
+	<li><a href="reproducir/30">Cuarto Dia</a></li>
+	<li><a href="reproducir/31">Quinto Dia</a></li>
+	<li><a href="reproducir/32">Sexto Dia</a></li>
+	<li><a href="reproducir/33">Septimo Dia</a></li>
+	<li><a href="reproducir/34">Octavo Dia</a></li>
+	<li><a href="reproducir/35">Noveno Dia</a></li>
+      </ul>
+      <h2>Villancicos</h2>
+      <ul class="menu_list">
+	<li><a href="reproducir/1">A La Nanita Nana</a></li>
+	<li><a href="reproducir/2">A Belen Pastores</a></li>
+      </ul>
+    </div>
   </body>
   
 </html>
