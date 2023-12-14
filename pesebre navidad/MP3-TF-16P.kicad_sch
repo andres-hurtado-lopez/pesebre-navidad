@@ -1,0 +1,35 @@
+(kicad_sch (version 20230121) (generator eeschema)
+
+  (uuid 6b267354-e2b5-45c9-a0a1-2bf1f485d85b)
+
+  (paper "A4")
+
+  (lib_symbols
+  )
+
+
+  (hierarchical_label "5V+" (shape input) (at 105.41 74.93 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 2d1ed5b2-19d3-42c0-8aaf-3c3d6c3454fb)
+  )
+  (hierarchical_label "TX" (shape input) (at 105.41 85.09 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 505becf2-d4c0-48aa-9c5c-9031bb07823e)
+  )
+  (hierarchical_label "GND" (shape input) (at 105.41 90.17 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 69a7a7a1-ce90-49e4-a6e8-8d855260c803)
+  )
+  (hierarchical_label "SPK+" (shape input) (at 105.41 96.52 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid de49b48f-5331-40c2-84a6-c20b8b384749)
+  )
+  (hierarchical_label "RX" (shape input) (at 105.41 80.01 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid e6825b7b-9304-4014-a379-603d2c72d9c9)
+  )
+  (hierarchical_label "SPK-" (shape input) (at 105.41 101.6 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid e91e2938-e450-4b5c-86d7-d26e84dac7ca)
+  )
+)

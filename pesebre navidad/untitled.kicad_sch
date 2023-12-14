@@ -1,0 +1,31 @@
+(kicad_sch (version 20230121) (generator eeschema)
+
+  (uuid 49aaf018-a564-48a9-8239-de913146d866)
+
+  (paper "A4")
+
+  (lib_symbols
+  )
+
+
+  (hierarchical_label "5V+" (shape input) (at 142.24 60.96 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 7a83f506-a046-41f1-a832-702194d85edb)
+  )
+  (hierarchical_label "IO00" (shape input) (at 142.24 64.77 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 8760c897-4089-4712-837f-f9f4c22df2b5)
+  )
+  (hierarchical_label "IO02" (shape input) (at 142.24 73.66 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 92845184-ba03-4999-bf2f-ba50a31c24f2)
+  )
+  (hierarchical_label "GND" (shape input) (at 142.24 77.47 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 960851d2-aa49-4bc8-8b70-c4d85a30c42f)
+  )
+  (hierarchical_label "IO01" (shape input) (at 142.24 68.58 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid e63728a4-5df9-4cbf-b2b6-9a9d17b399c9)
+  )
+)
