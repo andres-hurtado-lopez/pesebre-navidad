@@ -52,7 +52,7 @@
       function pause(song)  {
 	  fetch(`pause`, {
 	      method: 'GET',
-	  }).then(x=>{
+	  }).then( x=> {
 	      console.log(`target ${x}`);
 	  });
       }
@@ -72,7 +72,7 @@
 	      console.log(`target ${x}`);
 	  });
       }
-      
+	
     </script>
   </head>
 
@@ -91,14 +91,22 @@
       <h2>Novena de Aguinaldos</h2>
       <ul class="menu_list">
 	<li onclick="reproducir(27)">Primer Dia</li>
-	<li onclick="reproducir(28)">Segundo Dia</a></li>
-	<li onclick="reproducir(29)">Tercer Dia</a></li>
-	<li onclick="reproducir(30)">Cuarto Dia</a></li>
-	<li onclick="reproducir(31)">Quinto Dia</a></li>
-	<li onclick="reproducir(32)">Sexto Dia</a></li>
-	<li onclick="reproducir(33)">Septimo Dia</a></li>
-	<li onclick="reproducir(34)">Octavo Dia</a></li>
-	<li onclick="reproducir(35)">Noveno Dia</a></li>
+	<li onclick="reproducir(28)">Segundo Dia</li>
+	<li onclick="reproducir(29)">Tercer Dia</li>
+	<li onclick="reproducir(30)">Cuarto Dia</li>
+	<li onclick="reproducir(31)">Quinto Dia</li>
+	<li onclick="reproducir(32)">Sexto Dia</li>
+	<li onclick="reproducir(33)">Septimo Dia</li>
+	<li onclick="reproducir(34)">Octavo Dia</li>
+	<li onclick="reproducir(35)">Noveno Dia</li>
+      </ul>
+      <h2>Otros</h2>
+      <ul class="menu_list">
+	<li onclick="reproducir(36)">La Historia de la Navidad</li>
+	<li onclick="reproducir(23)">Buey</li>
+	<li onclick="reproducir(24)">Ovejas</li>
+	<li onclick="reproducir(25)">Aves</li>
+	<li onclick="reproducir(26)">Agua</li>
       </ul>
       <h2>Villancicos</h2>
       <ul class="menu_list">
@@ -120,8 +128,9 @@
 	<li><a onclick="reproducir(16)">Ya Viene el Ninito</a></li>
 	<li><a onclick="reproducir(17)">Yo Soy Vicentico</a></li>
 	<li><a onclick="reproducir(18)">Zagalillos</a></li>
-	<li><a onclick="reproducir(19)">jingle la 14 navidad</a></li>
-	<li><a onclick="reproducir(20)">Aguila Roja comercial</a></li>
+	<li><a onclick="reproducir(43)">El colibrí navideño</a></li>
+	<li><a onclick="reproducir(19)">Jingle la 14 navidad</a></li>
+	<li><a onclick="reproducir(20)">Jingle Aguila Roja comercial</a></li>
 	<li><a onclick="reproducir(21)">Jingle Navidad Caracol Radio</a></li>
 	<li><a onclick="reproducir(22)">Jingle Navidad RCN Radio</a></li>
 	

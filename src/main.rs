@@ -129,6 +129,7 @@ back_to_enum!{
 	Stop = 40,
 	IncVol = 41,
 	DecVol = 42,
+	Historia_navidad_043 = 43,
     }
 }
 
